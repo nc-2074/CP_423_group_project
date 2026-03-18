@@ -1,0 +1,23 @@
+# ── Speaker Diarization ──────────────────────────────────────────────
+pyannote.audio==3.3.2
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# ── Transcription ────────────────────────────────────────────────────
+groq                  # Whisper via Groq API (free tier)
+openai-whisper        # fallback local Whisper
+
+# ── Audio Processing ─────────────────────────────────────────────────
+pydub
+librosa
+soundfile
+ffmpeg-python
+
+# ── Utilities ────────────────────────────────────────────────────────
+python-dotenv
+requests
+numpy
+pandas
+
+# ── Storage / Indexing (later phases) ────────────────────────────────
+supabase
