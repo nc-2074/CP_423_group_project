@@ -1,4 +1,7 @@
-// Mode switching
+const API_URL = 'http://localhost:5001';
+let isProcessing = false;
+
+// ── Mode switching ────────────────────────────────────────────────────
 document.querySelectorAll('.mode-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -10,14 +13,13 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     });
 });
 
-// File upload handling
-const dropArea = document.getElementById('drop-area');
+// ── File upload handling ──────────────────────────────────────────────
+const dropArea  = document.getElementById('drop-area');
 const fileInput = document.getElementById('file-input');
 const browseBtn = document.getElementById('browse-btn');
-const fileInfo = document.getElementById('file-info');
-const fileName = document.getElementById('file-name');
+const fileInfo  = document.getElementById('file-info');
+const fileName  = document.getElementById('file-name');
 
-// Prevent default drag behaviors
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
     dropArea.addEventListener(eventName, preventDefaults, false);
     document.body.addEventListener(eventName, preventDefaults, false);
@@ -28,7 +30,6 @@ function preventDefaults(e) {
     e.stopPropagation();
 }
 
-// Highlight drop area on drag
 ['dragenter', 'dragover'].forEach(eventName => {
     dropArea.addEventListener(eventName, highlight, false);
 });
@@ -45,13 +46,12 @@ function unhighlight() {
     dropArea.classList.remove('highlight');
 }
 
-// Handle dropped files
 dropArea.addEventListener('drop', handleDrop, false);
 browseBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', handleFiles);
 
 function handleDrop(e) {
-    const dt = e.dataTransfer;
+    const dt    = e.dataTransfer;
     const files = dt.files;
     handleFiles({ target: { files } });
 }
@@ -62,54 +62,109 @@ function handleFiles(e) {
         const file = files[0];
         fileName.textContent = file.name;
         fileInfo.classList.remove('hidden');
-        
-        // Auto-process for demo
-        setTimeout(() => {
-            processInterview(file);
-        }, 500);
+        // User clicks Process Interview button — no auto-process
     }
 }
 
-// Process interview
+// ── Process interview ─────────────────────────────────────────────────
 document.getElementById('process-btn')?.addEventListener('click', () => {
     const file = fileInput.files[0];
     if (file) processInterview(file);
 });
 
 async function processInterview(file) {
+    if (isProcessing) return;
+    isProcessing = true;
+
     showResults();
-    
-    // Show loading state
-    document.getElementById('transcript-content').innerHTML = '<p>Processing audio...</p>';
-    
-    // Simulate processing (replace with actual API call)
-    setTimeout(() => {
-        const mockTranscript = generateMockTranscript();
-        displayTranscript(mockTranscript);
-        displayAnalysis(mockTranscript);
-    }, 2000);
+    document.getElementById('transcript-content').innerHTML =
+        '<p>⏳ Uploading audio file...</p>';
+
+    try {
+        // Step 1 — upload the file to Flask
+        const formData = new FormData();
+        formData.append('audio', file);
+
+        const uploadRes = await fetch(`${API_URL}/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!uploadRes.ok) throw new Error('Upload failed');
+        const uploadData = await uploadRes.json();
+        const audioPath  = uploadData.audio_path;
+
+        document.getElementById('transcript-content').innerHTML =
+            '<p>⏳ Running speaker separation and transcription...</p>';
+
+        // Step 2 — run the pipeline
+        const pipelineRes = await fetch(`${API_URL}/pipeline`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audio_path: audioPath }),
+        });
+
+        if (!pipelineRes.ok) throw new Error('Pipeline failed');
+        const pipelineData = await pipelineRes.json();
+
+        document.getElementById('transcript-content').innerHTML =
+            '<p>⏳ Indexing transcript...</p>';
+
+        // Step 3 — index the transcript
+        const indexRes = await fetch(`${API_URL}/index`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript_path: pipelineData.output_path }),
+        });
+
+        if (!indexRes.ok) throw new Error('Indexing failed');
+
+        document.getElementById('transcript-content').innerHTML =
+            '<p>⏳ Running MedGemma analysis (this takes a minute)...</p>';
+
+        // Step 4 — run analysis
+        const analysisRes = await fetch(`${API_URL}/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcript_path: pipelineData.output_path }),
+        });
+
+        if (!analysisRes.ok) throw new Error('Analysis failed');
+        const analysisData = await analysisRes.json();
+
+        // Display results
+        displayTranscript(pipelineData.transcript);
+        displayAnalysis(analysisData);
+
+    } catch (err) {
+        document.getElementById('transcript-content').innerHTML =
+            `<p>❌ Error: ${err.message}</p>`;
+        console.error(err);
+    } finally {
+        isProcessing = false;
+    }
 }
 
-// Generate tokens for LiveKit
+// ── Generate tokens for LiveKit ───────────────────────────────────────
 document.getElementById('generate-tokens-btn')?.addEventListener('click', generateTokens);
 
 async function generateTokens() {
     const tokensDiv = document.getElementById('tokens-display');
     tokensDiv.classList.remove('hidden');
-    
-    // Mock tokens for demo (replace with actual API call)
-    document.getElementById('patient-token').value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+    // Mock tokens for demo — replace with actual API call when LiveKit is set up
+    document.getElementById('patient-token').value   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
     document.getElementById('clinician-token').value = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
 }
 
-// Copy token functionality
+// ── Copy token functionality ──────────────────────────────────────────
 document.querySelectorAll('.copy-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-        const targetId = btn.dataset.target;
-        const textarea = document.getElementById(targetId);
+        const targetId  = btn.dataset.target;
+        const textarea  = document.getElementById(targetId);
         textarea.select();
         document.execCommand('copy');
-        
+
         const originalText = btn.textContent;
         btn.textContent = 'Copied!';
         setTimeout(() => {
@@ -118,89 +173,97 @@ document.querySelectorAll('.copy-btn').forEach(btn => {
     });
 });
 
-// Tab switching
+// ── Tab switching ─────────────────────────────────────────────────────
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
+
         const tab = btn.dataset.tab;
         document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
         document.getElementById(`${tab}-tab`).classList.add('active');
     });
 });
 
-// Speaker filter
+// ── Speaker filter ────────────────────────────────────────────────────
 document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
+
         const filter = btn.dataset.filter;
         filterTranscript(filter);
     });
 });
 
-// Search functionality
+// ── Search functionality ──────────────────────────────────────────────
 document.getElementById('search-btn')?.addEventListener('click', performSearch);
 
 async function performSearch() {
-    const query = document.getElementById('search-query').value;
+    const query      = document.getElementById('search-query').value;
+    const activeMode = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+
     if (!query) return;
-    
+
     const resultsDiv = document.getElementById('search-results');
-    resultsDiv.innerHTML = '<p>Searching...</p>';
-    
-    // Mock search results (replace with actual API call)
-    setTimeout(() => {
-        resultsDiv.innerHTML = `
-            <div class="search-result">
-                <h4>Results for: "${query}"</h4>
-                <div class="result-item">
-                    <span class="speaker-label">PATIENT:</span>
-                    <span>I have a headache for three days</span>
-                    <span class="timestamp">[14:35:22]</span>
-                </div>
-                <div class="result-item">
-                    <span class="speaker-label">CLINICIAN:</span>
-                    <span>Any other symptoms?</span>
-                    <span class="timestamp">[14:35:27]</span>
-                </div>
-                <p><small>Precision@5: 0.85 | Recall@5: 0.78</small></p>
-            </div>
-        `;
-    }, 1000);
+    resultsDiv.innerHTML = '<p>⏳ Searching...</p>';
+
+    try {
+        const res = await fetch(`${API_URL}/retrieve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, mode: activeMode, k: 5 }),
+        });
+
+        if (!res.ok) throw new Error('Search failed');
+        const data = await res.json();
+        displaySearchResults(data.results, query);
+
+    } catch (err) {
+        resultsDiv.innerHTML = `<p>❌ Search failed: ${err.message}</p>`;
+    }
 }
 
-// Helper functions
+function displaySearchResults(results, query) {
+    const resultsDiv = document.getElementById('search-results');
+
+    if (!results || results.length === 0) {
+        resultsDiv.innerHTML = `<p>No results found for "${query}"</p>`;
+        return;
+    }
+
+    resultsDiv.innerHTML = `<h4>Results for: "${query}"</h4>`;
+
+    results.forEach((result) => {
+        const div       = document.createElement('div');
+        div.className   = `result-item ${result.role.toLowerCase()}`;
+        div.innerHTML   = `
+            <span class="speaker-label">${result.role}:</span>
+            <span class="message-text">${result.text}</span>
+            <span class="timestamp">${result.start_time.toFixed(1)}s – ${result.end_time.toFixed(1)}s</span>
+            <small>Similarity: ${result.similarity.toFixed(3)}</small>
+        `;
+        resultsDiv.appendChild(div);
+    });
+}
+
+// ── Helper functions ──────────────────────────────────────────────────
 function showResults() {
     document.getElementById('results').classList.remove('hidden');
-}
-
-function generateMockTranscript() {
-    return [
-        { speaker: 'PATIENT', text: 'Hello doctor, I have a headache.', time: '14:35:22' },
-        { speaker: 'CLINICIAN', text: 'How long has this been going on?', time: '14:35:24' },
-        { speaker: 'PATIENT', text: 'About three days now.', time: '14:35:27' },
-        { speaker: 'CLINICIAN', text: 'Any other symptoms like fever or nausea?', time: '14:35:30' },
-        { speaker: 'PATIENT', text: 'No fever, but I feel a bit nauseous.', time: '14:35:33' },
-        { speaker: 'CLINICIAN', text: 'Have you taken any medication?', time: '14:35:36' },
-        { speaker: 'PATIENT', text: 'I took some ibuprofen yesterday.', time: '14:35:39' }
-    ];
 }
 
 function displayTranscript(transcript) {
     const content = document.getElementById('transcript-content');
     content.innerHTML = '';
-    
+
     transcript.forEach(line => {
-        const div = document.createElement('div');
-        div.className = `transcript-line ${line.speaker.toLowerCase()}`;
-        div.dataset.speaker = line.speaker;
-        div.innerHTML = `
-            <span class="timestamp">[${line.time}]</span>
-            <span class="speaker-label">${line.speaker}:</span>
-            <span>${line.text}</span>
+        const div       = document.createElement('div');
+        div.className   = `transcript-line ${line.role.toLowerCase()}`;
+        div.dataset.speaker = line.role;
+        div.innerHTML   = `
+            <span class="timestamp">${line.start.toFixed(1)}s</span>
+            <span class="speaker-label">${line.role}:</span>
+            <span class="message-text">${line.text}</span>
         `;
         content.appendChild(div);
     });
@@ -218,30 +281,62 @@ function filterTranscript(filter) {
     });
 }
 
-function displayAnalysis(transcript) {
+function formatMarkdown(text) {
+    // Convert **bold** to <strong>
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    
+    // Convert bullet points to proper list items
+    const lines = text.split('\n');
+    let result = '';
+    let inList = false;
+
+    lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+            if (!inList) {
+                result += '<ul style="margin-left: 20px; margin-top: 8px; margin-bottom: 8px;">';
+                inList = true;
+            }
+            result += `<li style="margin-bottom: 6px;">${trimmed.substring(2)}</li>`;
+        } else {
+            if (inList) {
+                result += '</ul>';
+                inList = false;
+            }
+            if (trimmed === '') {
+                result += '<br>';
+            } else {
+                result += `${trimmed}<br>`;
+            }
+        }
+    });
+
+    if (inList) result += '</ul>';
+    return result;
+}
+
+function displayAnalysis(analysis) {
     const content = document.getElementById('analysis-content');
     content.innerHTML = `
-        <h3>Interview Summary</h3>
-        <p>Total utterances: ${transcript.length}</p>
-        <p>Patient: ${transcript.filter(l => l.speaker === 'PATIENT').length} turns</p>
-        <p>Clinician: ${transcript.filter(l => l.speaker === 'CLINICIAN').length} turns</p>
-        
-        <h4>Key Symptoms Mentioned:</h4>
-        <ul>
-            <li>Headache (duration: 3 days)</li>
-            <li>Nausea (no fever)</li>
-        </ul>
-        
-        <h4>Medications Discussed:</h4>
-        <ul>
-            <li>Ibuprofen (taken yesterday)</li>
-        </ul>
-        
-        <h4>Clinician Questions:</h4>
-        <ul>
-            <li>Duration of symptoms</li>
-            <li>Associated symptoms (fever, nausea)</li>
-            <li>Medication history</li>
-        </ul>
+        <div class="analysis-section">
+            <h3>📋 Clinical Summary</h3>
+            <p>${formatMarkdown(analysis.summary)}</p>
+        </div>
+        <div class="analysis-section">
+            <h3>🩺 Symptom Q&A</h3>
+            <p>${formatMarkdown(analysis.symptom_qa)}</p>
+        </div>
+        <div class="analysis-section">
+            <h3>📊 Interview Quality</h3>
+            <p>${formatMarkdown(analysis.quality)}</p>
+        </div>
+        <div class="analysis-section">
+            <h3>🏥 Referral Recommendation</h3>
+            <p>${formatMarkdown(analysis.referral)}</p>
+        </div>
+        <div class="analysis-section">
+            <h3>❓ Follow-Up Questions</h3>
+            <p>${formatMarkdown(analysis.followup)}</p>
+        </div>
     `;
 }
