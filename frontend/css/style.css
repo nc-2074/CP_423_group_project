@@ -617,3 +617,36 @@ h2::after {
 .mt-20 { margin-top: 20px; }
 .mb-20 { margin-bottom: 20px; }
 .p-20 { padding: 20px; }
+
+/* Analysis sections */
+.analysis-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.analysis-section h3 {
+    color: #4B2E7A;
+    margin-bottom: 15px;
+    font-size: 1.2em;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #FDBB30;
+}
+
+.analysis-section p {
+    line-height: 1.8;
+    color: #333;
+}
+
+.analysis-section strong {
+    color: #4B2E7A;
+}
+
+/* Bullet points inside analysis */
+.analysis-section p • {
+    display: block;
+    margin-left: 20px;
+    margin-bottom: 8px;
+}
