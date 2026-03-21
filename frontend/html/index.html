@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clinical Interview IR System</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧑‍⚕️ Clinical Interview Analysis System</h1>
+        </header>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" data-mode="offline">📁 Offline Mode</button>
+            <button class="mode-btn" data-mode="live">🎤 Live Interview</button>
+        </div>
+
+        <!-- Offline Mode Panel -->
+        <div id="offline-mode" class="mode-panel active">
+            <h2>Upload Pre-recorded Interview</h2>
+            <div class="upload-area" id="drop-area">
+                <p>Drag & drop audio file here or click to browse</p>
+                <input type="file" id="file-input" accept="audio/*" hidden>
+                <button class="btn" id="browse-btn">Browse Files</button>
+            </div>
+            <div id="file-info" class="file-info hidden">
+                <p>Selected: <span id="file-name"></span></p>
+                <button class="btn primary" id="process-btn">Process Interview</button>
+            </div>
+        </div>
+
+        <!-- Live Mode Panel -->
+        <div id="live-mode" class="mode-panel">
+            <h2>Start Live Interview</h2>
+            <div class="live-controls">
+                <div class="token-section">
+                    <h3>Step 1: Get Access Tokens</h3>
+                    <button class="btn" id="generate-tokens-btn">Generate Tokens</button>
+                    <div id="tokens-display" class="tokens hidden">
+                        <div class="token-box">
+                            <label>👤 Patient Token:</label>
+                            <textarea id="patient-token" readonly rows="2"></textarea>
+                            <button class="copy-btn" data-target="patient-token">Copy</button>
+                        </div>
+                        <div class="token-box">
+                            <label>👨‍⚕️ Clinician Token:</label>
+                            <textarea id="clinician-token" readonly rows="2"></textarea>
+                            <button class="copy-btn" data-target="clinician-token">Copy</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="join-section">
+                    <h3>Step 2: Join LiveKit Meet</h3>
+                    <p>Open <a href="https://meet.livekit.io" target="_blank">meet.livekit.io</a> and paste your token</p>
+                    <div class="livekit-url">
+                        <label>LiveKit URL:</label>
+                        <input type="text" id="livekit-url" readonly value="wss://cp423-project-nj7awn54.livekit.cloud">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="results-panel hidden">
+            <h2>📝 Interview Results</h2>
+            <div class="results-tabs">
+                <button class="tab-btn active" data-tab="transcript">Transcript</button>
+                <button class="tab-btn" data-tab="analysis">Analysis</button>
+                <button class="tab-btn" data-tab="retrieval">Retrieval</button>
+            </div>
+            
+            <!-- Transcript Tab -->
+            <div id="transcript-tab" class="tab-panel active">
+                <div class="speaker-filter">
+                    <label>Filter: </label>
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="patient">Patient only</button>
+                    <button class="filter-btn" data-filter="clinician">Clinician only</button>
+                </div>
+                <div id="transcript-content" class="transcript-content">
+                    <!-- Transcript will appear here -->
+                </div>
+            </div>
+            
+            <!-- Analysis Tab -->
+            <div id="analysis-tab" class="tab-panel">
+                <div id="analysis-content">
+                    <!-- Analysis will appear here -->
+                </div>
+            </div>
+            
+            <!-- Retrieval Tab -->
+            <div id="retrieval-tab" class="tab-panel">
+                <div class="search-box">
+                    <input type="text" id="search-query" placeholder="Ask a question...">
+                    <button class="btn primary" id="search-btn">Search</button>
+                </div>
+                <div id="search-results">
+                    <!-- Search results will appear here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/main.js"></script>
+</body>
+</html>

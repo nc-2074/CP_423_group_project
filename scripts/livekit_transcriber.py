@@ -1,11 +1,12 @@
 """
-LiveKit Real-time Transcriber with Groq Whisper
-For Person A - Audio Processing Lead
+LiveKit Real-time Transcriber with Groq Whisper - Optimized
+With preloading and timing diagnostics
 """
 
 import os
 import asyncio
 import logging
+import time
 from dotenv import load_dotenv
 from livekit.agents import (
     AutoSubscribe,
@@ -16,8 +17,7 @@ from livekit.agents import (
     Agent
 )
 from livekit.plugins import groq
-from livekit.plugins.silero import VAD  # Correct import for Silero VAD
-import time
+from livekit.plugins.silero import VAD
 
 # Load environment variables
 load_dotenv()
@@ -26,24 +26,35 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("transcriber")
 
+# ========== PRELOAD ONCE (GLOBAL) ==========
+# This avoids downloading/loading models on every connection
+print("🔄 Preloading models (this happens once at startup)...")
+start_preload = time.time()
+
+# Preload VAD model
+vad = VAD.load()
+print(f"✅ VAD loaded in {time.time() - start_preload:.2f}s")
+
+# Preload Groq STT
+stt = groq.STT()
+print(f"✅ Groq STT initialized in {time.time() - start_preload:.2f}s")
+print("=" * 60)
+
 
 class TranscriptionAgent(Agent):
     def __init__(self):
         super().__init__(
             instructions="You are a real-time transcriber. Just transcribe what you hear.",
-            stt=groq.STT(),  # Uses Groq Whisper
+            stt=stt,  # Use preloaded STT
         )
 
     async def on_user_turn_completed(self, chat_ctx, new_message):
         """Called when user speech is transcribed"""
         if new_message and hasattr(new_message, 'text_content') and new_message.text_content:
-            # Get timestamp
             timestamp = time.strftime("%H:%M:%S")
-
-            # Print the transcription with speaker info
             print(f"[{timestamp}] {new_message.text_content}")
 
-            # Also save to a file
+            # Save to file
             with open("transcript_log.txt", "a", encoding="utf-8") as f:
                 f.write(f"[{timestamp}] {new_message.text_content}\n")
 
@@ -51,7 +62,7 @@ class TranscriptionAgent(Agent):
 async def entrypoint(ctx: JobContext):
     """Main entry point for the agent"""
     print("\n" + "=" * 60)
-    print("LIVEKIT REAL-TIME TRANSCRIBER")
+    print("LIVEKIT REAL-TIME TRANSCRIBER (Optimized)")
     print("=" * 60)
 
     # Verify credentials
@@ -66,26 +77,25 @@ async def entrypoint(ctx: JobContext):
 
     try:
         # Connect to the room (audio only)
+        start_connect = time.time()
         await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
-        print("✅ Connected to LiveKit room")
+        print(
+            f"✅ Connected to LiveKit room ({time.time() - start_connect:.2f}s)")
 
-        # Initialize VAD (Voice Activity Detection)
-        vad = VAD.load()  # <-- This is the correct way to use Silero VAD
-
-        # Create the agent session with Groq STT
+        # Create agent session with preloaded components
+        start_session = time.time()
         session = AgentSession(
-            stt=groq.STT(),
-            vad=vad,  # Pass the loaded VAD instance
+            stt=stt,   # Preloaded
+            vad=vad,   # Preloaded
         )
 
-        # Create the transcriber agent
         agent = TranscriptionAgent()
 
-        # Start the session
         await session.start(
             agent=agent,
             room=ctx.room,
         )
+        print(f"✅ Session started ({time.time() - start_session:.2f}s)")
 
         print("\n🎤 Transcriber ready! Waiting for participants...")
         print("   Speaker labels will appear automatically")
@@ -101,6 +111,7 @@ async def entrypoint(ctx: JobContext):
         traceback.print_exc()
     finally:
         print("\n👋 Transcriber stopped")
+
 
 if __name__ == "__main__":
     # Run the worker
